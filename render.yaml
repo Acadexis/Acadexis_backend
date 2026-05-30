@@ -2,14 +2,13 @@ services:
   - type: web
     name: acadexis-backend
     runtime: python
+    pythonVersion: "3.11"
     plan: starter
     buildCommand: bash build.sh
     startCommand: gunicorn Acadexis_backend.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: Acadexis_backend.settings.production
-      - key: PYTHON_VERSION
-        value: "3.11"
     envVarGroups:
       - import: prod
     branches:
@@ -21,6 +20,7 @@ services:
   - type: background_worker
     name: acadexis-celery
     runtime: python
+    pythonVersion: "3.11"
     plan: starter
     buildCommand: bash build.sh
     startCommand: celery -A Acadexis_backend worker --loglevel=info

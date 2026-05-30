@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: acadexis-backend
+    runtime: python
+    plan: starter
+    buildCommand: bash build.sh
+    startCommand: gunicorn Acadexis_backend.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: Acadexis_backend.settings.production
+      - key: PYTHON_VERSION
+        value: "3.11"
+    envVarGroups:
+      - import: prod
+    branches:
+      - branch: main
+        isProduction: true
+      - branch: dev
+    healthCheckPath: /api/auth/current-user/
+    
+  - type: background_worker
+    name: acadexis-celery
+    runtime: python
+    plan: starter
+    buildCommand: bash build.sh
+    startCommand: celery -A Acadexis_backend worker --loglevel=info
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: Acadexis_backend.settings.production
+    envVarGroups:
+      - import: prod
+    branches:
+      - branch: main
+        isProduction: true
+      - branch: dev

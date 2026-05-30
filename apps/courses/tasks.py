@@ -1,50 +1,65 @@
-import pdfplumber
+﻿import logging
 from celery import shared_task
-from openai import OpenAI
-from django.conf import settings
-from .models import CourseMaterial, MaterialChunk
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY if hasattr(settings, "OPENAI_API_KEY") else None)
+logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 800   # characters
-CHUNK_OVERLAP = 100
 
-def chunk_text(text: str):
-    chunks, i = [], 0
-    while i < len(text):
-        chunks.append(text[i:i + CHUNK_SIZE])
-        i += CHUNK_SIZE - CHUNK_OVERLAP
-    return chunks
-
-def embed(texts):
-    res = client.embeddings.create(model="text-embedding-3-small", input=texts)
-    return [d.embedding for d in res.data]
-
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def process_material(self, material_id: str):
-    m = CourseMaterial.objects.get(id=material_id)
+    from .models import CourseMaterial
+
     try:
-        records = []
-        with pdfplumber.open(m.file.path) as pdf:
-            m.page_count = len(pdf.pages)
-            for page_no, page in enumerate(pdf.pages, start=1):
-                text = (page.extract_text() or "").strip()
-                if not text: continue
-                for chunk in chunk_text(text):
-                    records.append((page_no, chunk))
+        material = CourseMaterial.objects.get(id=material_id)
+    except CourseMaterial.DoesNotExist:
+        logger.error(f"process_material: CourseMaterial {material_id} not found.")
+        return
 
-        # Batch embed (100 at a time)
-        for i in range(0, len(records), 100):
-            batch = records[i:i+100]
-            vectors = embed([c for _, c in batch])
-            MaterialChunk.objects.bulk_create([
-                MaterialChunk(material=m, page=p, content=c, embedding=v)
-                for (p, c), v in zip(batch, vectors)
-            ])
+    try:
+        material.status = "processing"
+        material.save(update_fields=["status"])
 
-        m.status = CourseMaterial.Status.READY
-        m.save()
+        extracted = _extract_text_stub(material)
+        page_count = extracted.get("page_count", 0)
+        chunks = _chunk_text_stub(extracted.get("pages", []))
+
+        # TODO (AI team): Generate OpenAI embeddings per chunk and create MaterialChunk records.
+        # _embed_and_store_chunks(material, chunks)
+
+        material.page_count = page_count
+        material.status = "ready"
+        material.save(update_fields=["page_count", "status"])
+
+        _notify_material_ready(material)
+        logger.info(f"process_material: {material.file_name} ready.")
+
     except Exception as exc:
-        m.status = CourseMaterial.Status.FAILED
-        m.save()
-        raise self.retry(exc=exc, countdown=30)
+        logger.error(f"process_material: Failed for {material_id} — {exc}")
+        material.status = "failed"
+        material.save(update_fields=["status"])
+        raise self.retry(exc=exc)
+
+
+def _extract_text_stub(material) -> dict:
+    """STUB — AI team replaces with real text extraction."""
+    return {"page_count": 1, "pages": [{"page": 1, "text": ""}]}
+
+
+def _chunk_text_stub(pages: list) -> list:
+    """STUB — AI team replaces with sliding-window chunking."""
+    return [{"page": p["page"], "content": p["text"]} for p in pages]
+
+
+def _notify_material_ready(material):
+    if not material.uploaded_by:
+        return
+    try:
+        from apps.notifications.models import Notification
+
+        Notification.objects.create(
+            user=material.uploaded_by,
+            title="Material Ready",
+            message=f"{material.file_name} has been processed and is ready for study.",
+            type=Notification.Type.COURSE,
+        )
+    except Exception as e:
+        logger.warning(f"_notify_material_ready: Could not create notification — {e}")

@@ -1,0 +1,9 @@
+Hello {{ user.email }},
+
+Welcome to Acadexis! We're glad to have you on board.
+
+You can now access your courses, upload materials, and start studying with ease.
+
+Visit {{ frontend_url }} to get started.
+
+— The Acadexis Team

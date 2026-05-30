@@ -61,9 +61,14 @@ CORS_ALLOWED_ORIGINS = [
 
 
 # ------------------------------------------------------------------
-# Email — print to console in development (no SendGrid needed)
+# Email — use Resend if configured, otherwise print to console in development.
 # ------------------------------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+RESEND_API_KEY = config("RESEND_API_KEY", default=None)
+EMAIL_BACKEND = (
+    "apps.accounts.email_backend.ResendEmailBackend"
+    if RESEND_API_KEY
+    else "django.core.mail.backends.console.EmailBackend"
+)
 
 
 

@@ -65,9 +65,14 @@ X_FRAME_OPTIONS = "DENY"
 
 
 # ------------------------------------------------------------------
-# Email — SendGrid (configured in base.py, key comes from env)
+# Email — use Resend if configured, otherwise fallback to SMTP.
 # ------------------------------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+RESEND_API_KEY = config("RESEND_API_KEY", default=None)
+EMAIL_BACKEND = (
+    "apps.accounts.email_backend.ResendEmailBackend"
+    if RESEND_API_KEY
+    else config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+)
 
 
 

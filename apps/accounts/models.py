@@ -1,5 +1,8 @@
+from datetime import timedelta
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
+from django.conf import settings
 from apps.institutions.models import TimestampedModel, University, Department
 import uuid
 
@@ -42,3 +45,17 @@ class Profile(TimestampedModel):
     level = models.CharField(max_length=50, blank=True)  # "3rd Year", "Professor"
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, related_name="profiles")
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_tokens")
+    token = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def is_expired(self):
+        timeout = getattr(settings, "PASSWORD_RESET_TIMEOUT", 259200)
+        return timezone.now() > self.created_at + timedelta(seconds=timeout)

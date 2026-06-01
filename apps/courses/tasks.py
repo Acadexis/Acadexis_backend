@@ -55,11 +55,15 @@ def _notify_material_ready(material):
     try:
         from apps.notifications.models import Notification
 
-        Notification.objects.create(
+        Notification.create_and_push(
             user=material.uploaded_by,
             title="Material Ready",
-            message=f"{material.file_name} has been processed and is ready for study.",
-            type=Notification.Type.COURSE,
+            body=f"{material.file_name} has been processed and is ready for study.",
+            notification_type="material_ready",
+            data={
+                "material_id": str(material.id),
+                "course_id": str(material.course.id),
+            },
         )
     except Exception as e:
-        logger.warning(f"_notify_material_ready: Could not create notification — {e}")
+        logger.warning(f"_notify_material_ready: Could not send notification — {e}")

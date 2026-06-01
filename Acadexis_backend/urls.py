@@ -5,22 +5,20 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
-from apps.studylab.views import StudySessionViewSet
-from apps.analytics.views import HeatmapViewSet, BookmarkViewSet
-from apps.notifications.views import NotificationViewSet
+from apps.analytics.views import BookmarkViewSet
 from apps.support.views import ContactView, ReportView, AdminRequestView
 
 router = DefaultRouter()
-router.register("sessions", StudySessionViewSet, basename="sessions")
-router.register("heatmap", HeatmapViewSet, basename="heatmap")
 router.register("bookmarks", BookmarkViewSet, basename="bookmarks")
-router.register("notifications", NotificationViewSet, basename="notifications")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
     path("api/", include("apps.institutions.urls")),
     path("api/", include("apps.courses.urls")),
+    path("api/", include("apps.studylab.urls")),
+    path("api/", include("apps.analytics.urls")),
+    path("api/", include("apps.notifications.urls")),
     path("api/", include(router.urls)),
     path("api/support/contact/", ContactView.as_view()),
     path("api/support/report/", ReportView.as_view()),

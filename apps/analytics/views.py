@@ -1,16 +1,35 @@
-from rest_framework import viewsets
-from rest_framework.response import Response
+from rest_framework import generics, filters, viewsets
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+
+from apps.accounts.permissions import IsLecturerOrAdmin
 from .models import TopicStruggle, Bookmark
-from .serializers import HeatmapSerializer, BookmarkSerializer
+from .serializers import TopicStruggleSerializer, BookmarkSerializer
 
-class HeatmapViewSet(viewsets.ViewSet):
-    def list(self, request):
-        course_id = request.query_params.get("course")
-        qs = TopicStruggle.objects.filter(course_id=course_id) if course_id else TopicStruggle.objects.all()
-        return Response(HeatmapSerializer(qs, many=True).data)
 
-class BookmarkViewSet(viewsets.ModelViewSet):
+class HeatmapListView(generics.ListAPIView):
+    serializer_class = TopicStruggleSerializer
+    permission_classes = [IsAuthenticated, IsLecturerOrAdmin]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_fields = ["course"]
+    ordering_fields = ["questions_asked", "avg_confidence", "struggling_students", "updated_at"]
+    ordering = ["-questions_asked"]
+    search_fields = ["topic"]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = TopicStruggle.objects.select_related("course")
+        if user.role == "admin":
+            return qs.all()
+        return qs.filter(course__lecturer=user)
+
+
+class BookmarkViewSet(viewsets.ViewSet, generics.ListCreateAPIView):
     serializer_class = BookmarkSerializer
+    permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         return Bookmark.objects.filter(user=self.request.user)
-    def perform_create(self, s): s.save(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

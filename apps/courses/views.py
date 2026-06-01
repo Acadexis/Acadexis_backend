@@ -75,7 +75,20 @@ class CourseViewSet(ModelViewSet):
                 {"detail": "Only students can enroll in courses."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        Enrollment.objects.get_or_create(student=request.user, course=course)
+        created = Enrollment.objects.get_or_create(student=request.user, course=course)
+        try:
+            from apps.notifications.models import Notification
+            # Notify lecturer (best-effort)
+            if course.lecturer:
+                Notification.create_and_push(
+                    user=course.lecturer,
+                    title="New Enrollment",
+                    body=f"{request.user.email} has enrolled in {course.title}.",
+                    notification_type="new_enrollment",
+                    data={"course_id": str(course.id), "student_id": str(request.user.id)},
+                )
+        except Exception:
+            pass
         return Response({"success": True})
 
     @action(detail=True, methods=["post"], url_path="rate")

@@ -15,6 +15,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 # ------------------------------------------------------------------
+# Core
+# ------------------------------------------------------------------
+APPEND_SLASH = True
+
+
+# ------------------------------------------------------------------
 # Applications
 # ------------------------------------------------------------------
 
@@ -84,7 +90,15 @@ TEMPLATES = [{
 
 ASGI_APPLICATION = "Acadexis_backend.asgi.application"
 WSGI_APPLICATION = "Acadexis_backend.wsgi.application"
-
+# Channels (WebSocket) configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [os.environ.get("REDIS_URL", "redis://localhost:6379/0")],
+        },
+    },
+}
 
 # ------------------------------------------------------------------
 # Auth
@@ -113,6 +127,7 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {"user": "1000/day", "anon": "100/day"},
+    "EXCEPTION_HANDLER": "Acadexis_backend.exception_handler.custom_exception_handler",
 }
 
 SPECTACULAR_SETTINGS = {
@@ -150,6 +165,7 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
+    "TOKEN_OBTAIN_SERIALIZER": "apps.accounts.serializers.CustomTokenSerializer",
 }
 
 
@@ -169,6 +185,9 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
+
+CORS_ALLOW_ALL_ORIGINS = os.environ.get("DEBUG", "True") == "True"
+
 
 # ------------------------------------------------------------------
 # Internationalisation
@@ -248,3 +267,42 @@ EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 
 OPENAI_API_KEY = config("OPENAI_API_KEY", default=None)
+
+
+# ------------------------------------------------------------------
+# Logging (base configuration)
+# ------------------------------------------------------------------
+# Note: DEBUG is not available in base.py, so we use 'simple' formatter by default.
+# Environment-specific settings (development.py/production.py) will override if needed.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{levelname}] {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{levelname}] {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "celery": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "apps.courses": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "apps.studylab": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "apps.notifications": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "apps.analytics": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}

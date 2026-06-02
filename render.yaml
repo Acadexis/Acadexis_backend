@@ -2,7 +2,7 @@ services:
   - type: web
     name: acadexis-backend
     runtime: python
-    pythonVersion: "3.11"
+    pythonVersion: "3.12"
     plan: starter
     buildCommand: bash build.sh
     startCommand: gunicorn Acadexis_backend.wsgi:application --bind 0.0.0.0:$PORT
@@ -15,12 +15,12 @@ services:
       - branch: main
         isProduction: true
       - branch: dev
-    healthCheckPath: /api/auth/current-user/
-    
+    healthCheckPath: /api/auth/me/
+
   - type: background_worker
     name: acadexis-celery
     runtime: python
-    pythonVersion: "3.11"
+    pythonVersion: "3.12"
     plan: starter
     buildCommand: bash build.sh
     startCommand: celery -A Acadexis_backend worker --loglevel=info

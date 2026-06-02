@@ -11,6 +11,10 @@ python -m pip install -r requirements.txt
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear
 
+# Enable pgvector extension (required for vector embeddings)
+echo "Enabling pgvector extension..."
+python manage.py enable_pgvector
+
 # Run migrations
 echo "Running migrations..."
 python manage.py migrate

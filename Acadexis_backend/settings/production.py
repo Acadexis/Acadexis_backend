@@ -42,9 +42,18 @@ DATABASES = {
 # ------------------------------------------------------------------
 # CORS
 # ------------------------------------------------------------------
+# DEBUG: Force allow all origins to test - remove after debugging
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "https://studywithacadexis.vercel.app",
+    "https://acadexis-backend.onrender.com",
+]
+
+# Also allow any origin in development
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default=""
-).split(",")
+).split(",") if config("CORS_ALLOWED_ORIGINS", default="") else CORS_ALLOWED_ORIGINS
 
 CSRF_TRUSTED_ORIGINS = [
     "https://studywithacadexis.vercel.app",

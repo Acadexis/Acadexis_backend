@@ -10,6 +10,7 @@ from .views import (
     ResetPasswordView,
     ChangePasswordView,
     CSRFTokenView,
+    AdminLoginView,
 )
 
 urlpatterns = [
@@ -23,4 +24,5 @@ urlpatterns = [
     path("reset-password/", ResetPasswordView.as_view(), name="reset-password"),
     path("change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("csrf/", CSRFTokenView.as_view(), name="auth-csrf"),
+    path("admin-login/", AdminLoginView.as_view(), name="auth-admin-login"),
 ]

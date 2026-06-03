@@ -198,4 +198,70 @@ class CSRFTokenView(APIView):
 
     @method_decorator(ensure_csrf_cookie)
     def get(self, request, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"CSRF token request from origin: {request.headers.get('origin')}")
+        logger.info(f"CSRF cookie present: {request.csrf_cookie_needs_reset}")
         return Response({"message": "CSRF cookie set"})
+
+
+class AdminLoginView(APIView):
+    """
+    Custom admin login endpoint that uses DRF authentication.
+    This is an alternative to Django admin's built-in login which has
+    CSRF issues with cross-origin requests.
+    """
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [parsers.FormParser, parsers.JSONParser]
+
+    def post(self, request, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
+
+        username = request.data.get("username")
+        password = request.data.get("password")
+
+        logger.info(f"Admin login attempt for username: {username}")
+
+        if not username or not password:
+            return Response(
+                {"detail": "Username and password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from django.contrib.auth import authenticate
+        user = authenticate(username=username, password=password)
+
+        if user is None:
+            return Response(
+                {"detail": "Invalid credentials."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if not user.is_active:
+            return Response(
+                {"detail": "User account is disabled."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Check if user is admin
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"detail": "Access denied. Admin credentials required."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "role": "admin",
+                "name": user.get_full_name() or user.username,
+                "profile": {},
+            }
+        })

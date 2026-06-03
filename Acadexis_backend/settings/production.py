@@ -54,8 +54,17 @@ CSRF_TRUSTED_ORIGINS = [
 # Cross-origin cookies for Vercel ↔ Render
 CSRF_COOKIE_NAME = "csrftoken"
 SESSION_COOKIE_NAME = "sessionid"
-CSRF_COOKIE_SAMESITE = "None"  # Required for cross-origin requests
-CSRF_COOKIE_DOMAIN = None  # Don't set domain for cross-origin
+
+# Cross-origin cookies - required for Vercel ↔ Render
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_DOMAIN = None
+SESSION_COOKIE_DOMAIN = None
+CSRF_USE_SESSIONS = False  # Use cookie-based CSRF (not sessions)
+
+# Ensure cookies work across origins
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 
 

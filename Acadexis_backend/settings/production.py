@@ -46,6 +46,17 @@ CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default=""
 ).split(",")
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://studywithacadexis.vercel.app",
+    "https://acadexis-backend.onrender.com",
+]
+
+# Cross-origin cookies for Vercel ↔ Render
+CSRF_COOKIE_NAME = "csrftoken"
+SESSION_COOKIE_NAME = "sessionid"
+CSRF_COOKIE_SAMESITE = "None"  # Required for cross-origin requests
+CSRF_COOKIE_DOMAIN = None  # Don't set domain for cross-origin
+
 
 
 # ------------------------------------------------------------------

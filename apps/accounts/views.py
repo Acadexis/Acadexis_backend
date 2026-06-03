@@ -201,7 +201,6 @@ class CSRFTokenView(APIView):
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"CSRF token request from origin: {request.headers.get('origin')}")
-        logger.info(f"CSRF cookie present: {request.csrf_cookie_needs_reset}")
         return Response({"message": "CSRF cookie set"})
 
 
@@ -210,6 +209,8 @@ class AdminLoginView(APIView):
     Custom admin login endpoint that uses DRF authentication.
     This is an alternative to Django admin's built-in login which has
     CSRF issues with cross-origin requests.
+
+    Note: This User model uses email as the username field (USERNAME_FIELD = "email")
     """
     permission_classes = [permissions.AllowAny]
     parser_classes = [parsers.FormParser, parsers.JSONParser]
@@ -218,21 +219,38 @@ class AdminLoginView(APIView):
         import logging
         logger = logging.getLogger(__name__)
 
-        username = request.data.get("username")
+        # Support both "username" (for backward compat) and "email" in the payload
+        email = request.data.get("email") or request.data.get("username")
         password = request.data.get("password")
 
-        logger.info(f"Admin login attempt for username: {username}")
+        logger.info(f"Admin login attempt for email: {email}")
 
-        if not username or not password:
+        if not email or not password:
             return Response(
-                {"detail": "Username and password are required."},
+                {"detail": "Email and password are required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        from django.contrib.auth import authenticate
-        user = authenticate(username=username, password=password)
+        # Find user by email
+        from .models import User
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            logger.warning(f"User not found: {email}")
+            return Response(
+                {"detail": "Invalid credentials."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except User.MultipleObjectsReturned:
+            logger.error(f"Multiple users found: {email}")
+            return Response(
+                {"detail": "Invalid credentials."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
-        if user is None:
+        # Check password
+        if not user.check_password(password):
+            logger.warning(f"Invalid password for: {email}")
             return Response(
                 {"detail": "Invalid credentials."},
                 status=status.HTTP_401_UNAUTHORIZED
@@ -244,8 +262,9 @@ class AdminLoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # Check if user is admin
+        # Check if user is admin (is_staff or is_superuser)
         if not user.is_staff and not user.is_superuser:
+            logger.warning(f"Non-admin user attempted login: {email}")
             return Response(
                 {"detail": "Access denied. Admin credentials required."},
                 status=status.HTTP_403_FORBIDDEN
@@ -254,6 +273,7 @@ class AdminLoginView(APIView):
         # Generate tokens
         refresh = RefreshToken.for_user(user)
 
+        logger.info(f"Admin login successful for: {email}")
         return Response({
             "access": str(refresh.access_token),
             "refresh": str(refresh),
@@ -261,7 +281,7 @@ class AdminLoginView(APIView):
                 "id": str(user.id),
                 "email": user.email,
                 "role": "admin",
-                "name": user.get_full_name() or user.username,
+                "name": user.get_full_name() or user.email.split('@')[0],
                 "profile": {},
             }
         })

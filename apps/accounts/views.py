@@ -1,4 +1,6 @@
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 
 from rest_framework import generics, permissions, parsers, status
 from rest_framework.response import Response
@@ -183,3 +185,17 @@ class ChangePasswordView(APIView):
         user.set_password(serializer.validated_data["new_password"])
         user.save()
         return Response({"message": "Password changed successfully."})
+
+
+class CSRFTokenView(APIView):
+    """
+    Dedicated endpoint to fetch CSRF token.
+    This ensures the CSRF cookie is set for cross-origin requests.
+    Use this before making POST requests to Django admin or other endpoints
+    that require CSRF protection.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request, *args, **kwargs):
+        return Response({"message": "CSRF cookie set"})

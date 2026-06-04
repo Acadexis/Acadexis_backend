@@ -19,6 +19,7 @@ urlpatterns = [
     path("api/", include("apps.studylab.urls")),
     path("api/", include("apps.analytics.urls")),
     path("api/", include("apps.notifications.urls")),
+    path("api/admin/", include("apps.administration.urls")),
     path("api/", include(router.urls)),
     path("api/support/contact/", ContactView.as_view()),
     path("api/support/report/", ReportView.as_view()),

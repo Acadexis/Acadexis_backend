@@ -36,6 +36,7 @@ class AdminBaseViewSet(viewsets.ModelViewSet):
     - Includes search and filtering
     """
 
+    lookup_value_regex = "[0-9a-f-]+"
     permission_classes = [IsAuthenticated, IsStaffUser]
     filter_backends = [
         DjangoFilterBackend,
@@ -71,10 +72,13 @@ class UserAdminViewSet(AdminBaseViewSet):
     - CUSTOM: /deactivate/, /activate/
     """
 
+    lookup_value_regex = "[0-9a-f-]+"
     queryset = User.objects.all().prefetch_related("profile")
     serializer_class = UserAdminSerializer
-    filterset_fields = ["role", "is_active", "university"]
+    filterset_fields = ["role", "is_active", "university", "date_joined"]
     search_fields = ["email", "first_name", "last_name"]
+    ordering_fields = ["id", "email", "first_name", "last_name", "role", "date_joined", "last_login"]
+    ordering = ["-date_joined"]
 
     def get_serializer_class(self):
         if self.action == "list":

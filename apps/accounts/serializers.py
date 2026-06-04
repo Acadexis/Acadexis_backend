@@ -4,7 +4,7 @@ from django.db import transaction
 import os
 
 from .models import User, Profile
-from apps.institutions.models import University, Department
+from apps.institutions.models import University, Faculty, Department
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -90,11 +90,45 @@ class RegisterSerializer(serializers.Serializer):
     password = serializers.CharField(min_length=8, write_only=True)
     role = serializers.ChoiceField(choices=User.Role.choices)
     university = serializers.PrimaryKeyRelatedField(queryset=University.objects.all())
+    faculty = serializers.PrimaryKeyRelatedField(queryset=Faculty.objects.all())
+    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all())
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    identification_number = serializers.CharField()
+    identification_number = serializers.CharField(required=False, allow_blank=True)
     level = serializers.CharField(required=False, allow_blank=True)
-    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all())
+
+    def validate(self, attrs):
+        role = attrs.get("role")
+        faculty = attrs.get("faculty")
+        department = attrs.get("department")
+        university = attrs.get("university")
+        identification_number = attrs.get("identification_number", "").strip()
+        level = attrs.get("level", "").strip()
+
+        if department and department.faculty != faculty:
+            raise serializers.ValidationError(
+                {"department": "Department must belong to the selected faculty."}
+            )
+
+        if faculty and faculty.university != university:
+            raise serializers.ValidationError(
+                {"faculty": "Faculty must belong to the selected university."}
+            )
+
+        if role == User.Role.STUDENT:
+            if not identification_number:
+                raise serializers.ValidationError(
+                    {"identification_number": "This field is required for students."}
+                )
+            if not level:
+                raise serializers.ValidationError(
+                    {"level": "This field is required for students."}
+                )
+        else:
+            attrs["identification_number"] = identification_number
+            attrs["level"] = level
+
+        return attrs
 
     def create(self, validated):
         with transaction.atomic():
@@ -109,7 +143,7 @@ class RegisterSerializer(serializers.Serializer):
                 defaults={
                     "first_name": validated["first_name"],
                     "last_name": validated["last_name"],
-                    "identification_number": validated["identification_number"],
+                    "identification_number": validated.get("identification_number", ""),
                     "level": validated.get("level", ""),
                     "department": validated["department"],
                 },

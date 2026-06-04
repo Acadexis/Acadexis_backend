@@ -13,6 +13,9 @@ class ProfileSerializer(serializers.ModelSerializer):
     department = serializers.PrimaryKeyRelatedField(
         queryset=Department.objects.all(), allow_null=True, required=False
     )
+    department_name = serializers.SerializerMethodField()
+    faculty = serializers.SerializerMethodField()
+    university = serializers.SerializerMethodField()
     identification_number = serializers.CharField(read_only=True)
 
     class Meta:
@@ -23,6 +26,9 @@ class ProfileSerializer(serializers.ModelSerializer):
             "identification_number",
             "level",
             "department",
+            "department_name",
+            "faculty",
+            "university",
             "avatar",
             "avatar_url",
         ]
@@ -33,6 +39,19 @@ class ProfileSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.avatar.url)
             return obj.avatar.url
+        return None
+
+    def get_department_name(self, obj):
+        return obj.department.name if obj.department else None
+
+    def get_faculty(self, obj):
+        if obj.department and obj.department.faculty:
+            return obj.department.faculty.name
+        return None
+
+    def get_university(self, obj):
+        if obj.department and obj.department.faculty and obj.department.faculty.university:
+            return obj.department.faculty.university.name
         return None
 
     def get_avatar_url(self, obj):
@@ -53,12 +72,13 @@ class ProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
     university = serializers.PrimaryKeyRelatedField(read_only=True)
+    university_name = serializers.CharField(source="university.name", read_only=True)
     name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "email", "role", "university", "name", "profile"]
-        read_only_fields = ["id", "role", "university", "name"]
+        fields = ["id", "email", "role", "university", "university_name", "name", "profile"]
+        read_only_fields = ["id", "role", "university", "university_name", "name"]
 
     def get_name(self, obj):
         profile = getattr(obj, "profile", None)

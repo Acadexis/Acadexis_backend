@@ -1,5 +1,5 @@
 from rest_framework import generics, filters
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .models import University, Faculty, Department
 from .serializers import UniversitySerializer, FacultySerializer, DepartmentSerializer
@@ -8,7 +8,6 @@ from .serializers import UniversitySerializer, FacultySerializer, DepartmentSeri
 class UniversityListCreateView(generics.ListCreateAPIView):
     queryset = University.objects.all().order_by("name")
     serializer_class = UniversitySerializer
-    permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "code"]
     ordering_fields = ["name", "created_at"]
@@ -17,24 +16,24 @@ class UniversityListCreateView(generics.ListCreateAPIView):
         if self.request.method == "POST":
             from apps.accounts.permissions import IsAdmin
             return [IsAdmin()]
-        return [IsAuthenticated()]
+        # Allow public read access (for registration dropdowns)
+        return [AllowAny()]
 
 
 class UniversityDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = University.objects.all()
     serializer_class = UniversitySerializer
-    permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
         if self.request.method in ("PATCH", "PUT", "DELETE"):
             from apps.accounts.permissions import IsAdmin
             return [IsAdmin()]
-        return [IsAuthenticated()]
+        # Allow public read access (for registration dropdowns)
+        return [AllowAny()]
 
 
 class FacultyListCreateView(generics.ListCreateAPIView):
     serializer_class = FacultySerializer
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         university_id = self.request.query_params.get("university")
@@ -47,18 +46,19 @@ class FacultyListCreateView(generics.ListCreateAPIView):
         if self.request.method == "POST":
             from apps.accounts.permissions import IsAdmin
             return [IsAdmin()]
-        return [IsAuthenticated()]
+        # Allow public read access (for registration dropdowns)
+        return [AllowAny()]
 
 
 class FacultyDetailView(generics.RetrieveAPIView):
     queryset = Faculty.objects.select_related("university").all()
     serializer_class = FacultySerializer
-    permission_classes = [IsAuthenticated]
+    # Allow public read access (for registration dropdowns)
+    permission_classes = [AllowAny()]
 
 
 class DepartmentListCreateView(generics.ListCreateAPIView):
     serializer_class = DepartmentSerializer
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = Department.objects.select_related("faculty__university").all()
@@ -74,10 +74,12 @@ class DepartmentListCreateView(generics.ListCreateAPIView):
         if self.request.method == "POST":
             from apps.accounts.permissions import IsLecturerOrAdmin
             return [IsLecturerOrAdmin()]
-        return [IsAuthenticated()]
+        # Allow public read access (for registration dropdowns)
+        return [AllowAny()]
 
 
 class DepartmentDetailView(generics.RetrieveAPIView):
     queryset = Department.objects.select_related("faculty__university").all()
     serializer_class = DepartmentSerializer
-    permission_classes = [IsAuthenticated]
+    # Allow public read access (for registration dropdowns)
+    permission_classes = [AllowAny()]

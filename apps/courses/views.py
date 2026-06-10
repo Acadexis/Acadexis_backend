@@ -116,13 +116,21 @@ class CourseViewSet(ModelViewSet):
         """Get students enrolled in a specific course"""
         course = self.get_object()
         # Only the lecturer who owns the course or admins can view students
+        if request.user.role == "student":
+            return Response(
+                {"detail": "Only course instructors can view student details."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if request.user.role == "lecturer" and course.lecturer != request.user:
-            if request.user.role != "admin":
-                return Response(
-                    {"detail": "You can only view students in your own courses."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-        enrollments = course.enrollments.select_related("student__profile").order_by("-created_at")
+            return Response(
+                {"detail": "You can only view students in your own courses."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # Use proper select_related to get student profile data
+        enrollments = course.enrollments.select_related(
+            "student__profile",
+            "course"
+        ).order_by("-created_at")
         serializer = EnrollmentSerializer(enrollments, many=True, context={"request": request})
         return Response(serializer.data)
 

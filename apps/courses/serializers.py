@@ -4,7 +4,7 @@ from rest_framework import serializers
 from apps.accounts.models import User
 from apps.accounts.serializers import UserSerializer
 from apps.institutions.models import Department
-from .models import Course, CourseMaterial, CourseModule, CourseRating
+from .models import Course, CourseMaterial, CourseModule, CourseRating, Enrollment
 
 
 class CourseListSerializer(serializers.ModelSerializer):
@@ -54,6 +54,33 @@ class CourseListSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.enrollments.filter(student=request.user).exists()
         return False
+
+
+class EnrollmentSerializer(serializers.ModelSerializer):
+    student_id = serializers.UUIDField(source="student.id", read_only=True)
+    student_name = serializers.SerializerMethodField()
+    student_email = serializers.EmailField(source="student.email", read_only=True)
+    course_title = serializers.CharField(source="course.title", read_only=True)
+    course_code = serializers.CharField(source="course.code", read_only=True)
+
+    class Meta:
+        model = Enrollment
+        fields = [
+            "id",
+            "student_id",
+            "student_name",
+            "student_email",
+            "course_title",
+            "course_code",
+            "created_at",
+        ]
+
+    def get_student_name(self, obj):
+        profile = getattr(obj.student, "profile", None)
+        if profile:
+            full = f"{profile.first_name} {profile.last_name}".strip()
+            return full if full else obj.student.email
+        return obj.student.email
 
 
 class CourseDetailSerializer(CourseListSerializer):

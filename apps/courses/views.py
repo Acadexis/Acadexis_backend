@@ -18,6 +18,7 @@ from .serializers import (
     CourseModuleSerializer,
     CourseMaterialSerializer,
     CourseMaterialUploadSerializer,
+    EnrollmentSerializer,
 )
 from .tasks import process_material
 from apps.accounts.permissions import IsLecturerOrAdmin
@@ -109,6 +110,21 @@ class CourseViewSet(ModelViewSet):
         except Exception:
             pass
         return Response({"success": True})
+
+    @action(detail=True, methods=["get"], url_path="students")
+    def students(self, request, pk=None):
+        """Get students enrolled in a specific course"""
+        course = self.get_object()
+        # Only the lecturer who owns the course or admins can view students
+        if request.user.role == "lecturer" and course.lecturer != request.user:
+            if request.user.role != "admin":
+                return Response(
+                    {"detail": "You can only view students in your own courses."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        enrollments = course.enrollments.select_related("student__profile").order_by("-created_at")
+        serializer = EnrollmentSerializer(enrollments, many=True, context={"request": request})
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="rate")
     def rate(self, request, pk=None):

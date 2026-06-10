@@ -11,8 +11,8 @@ class CourseListSerializer(serializers.ModelSerializer):
     department_id = serializers.UUIDField(source="department.id", read_only=True)
     lecturer_id = serializers.UUIDField(source="lecturer.id", read_only=True)
     lecturer_name = serializers.SerializerMethodField()
-    materials_count = serializers.IntegerField(source="materials_count", read_only=True)
-    students_enrolled = serializers.IntegerField(source="students_enrolled", read_only=True)
+    materials_count = serializers.IntegerField(read_only=True)
+    students_enrolled = serializers.IntegerField(read_only=True)
     thumbnail = serializers.SerializerMethodField()
     is_enrolled = serializers.SerializerMethodField()
 

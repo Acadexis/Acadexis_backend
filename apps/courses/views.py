@@ -32,9 +32,28 @@ class CourseViewSet(ModelViewSet):
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        return Course.objects.select_related(
+        user = self.request.user
+        base_queryset = Course.objects.select_related(
             "department__faculty__university", "lecturer__profile"
-        ).prefetch_related("enrollments", "materials").all()
+        ).prefetch_related("enrollments", "materials")
+
+        # Students: only see courses from their university AND department
+        if user.role == "student":
+            if not user.university or not user.profile.department:
+                return base_queryset.none()
+            return base_queryset.filter(
+                department__faculty__university=user.university,
+                department=user.profile.department
+            )
+
+        # Lecturers: see courses in their university (they can teach across departments)
+        if user.role == "lecturer":
+            if not user.university:
+                return base_queryset.none()
+            return base_queryset.filter(department__faculty__university=user.university)
+
+        # Admins: see all courses
+        return base_queryset.all()
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):

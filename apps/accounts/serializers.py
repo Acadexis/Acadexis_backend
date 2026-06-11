@@ -177,6 +177,24 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         token["role"] = user.role
         token["email"] = user.email
+
+        # Include profile data in token for frontend hydration
+        profile = getattr(user, "profile", None)
+        if profile:
+            token["first_name"] = profile.first_name
+            token["last_name"] = profile.last_name
+            token["identification_number"] = profile.identification_number
+            token["level"] = profile.level
+            token["department"] = str(profile.department.id) if profile.department else None
+            token["department_name"] = profile.department.name if profile.department else None
+            token["faculty"] = str(profile.department.faculty.id) if profile.department and profile.department.faculty else None
+            token["faculty_name"] = profile.department.faculty.name if profile.department and profile.department.faculty else None
+
+        # Include university info
+        if user.university:
+            token["university"] = str(user.university.id)
+            token["university_name"] = user.university.name
+
         return token
 
     def validate(self, attrs):

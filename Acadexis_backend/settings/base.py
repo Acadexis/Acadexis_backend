@@ -272,6 +272,14 @@ OPENAI_API_KEY = config("OPENAI_API_KEY", default=None)
 
 
 # ------------------------------------------------------------------
+# Google OAuth2 Credentials
+# ------------------------------------------------------------------
+GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="YOUR_GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = config("GOOGLE_CLIENT_SECRET", default="YOUR_GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = config("GOOGLE_REDIRECT_URI", default="http://localhost:3000/auth/google/callback")
+
+
+# ------------------------------------------------------------------
 # Logging (base configuration)
 # ------------------------------------------------------------------
 # Note: DEBUG is not available in base.py, so we use 'simple' formatter by default.

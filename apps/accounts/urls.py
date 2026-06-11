@@ -11,6 +11,8 @@ from .views import (
     ChangePasswordView,
     CSRFTokenView,
     AdminLoginView,
+    GoogleAuthUrlView,
+    GoogleAuthCallbackView,
 )
 
 urlpatterns = [
@@ -25,4 +27,6 @@ urlpatterns = [
     path("change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("csrf/", CSRFTokenView.as_view(), name="auth-csrf"),
     path("admin-login/", AdminLoginView.as_view(), name="auth-admin-login"),
+    path("google/university/", GoogleAuthUrlView.as_view(), name="google-auth-url"),
+    path("google/callback/", GoogleAuthCallbackView.as_view(), name="google-auth-callback"),
 ]

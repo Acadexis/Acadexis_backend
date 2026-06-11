@@ -288,3 +288,223 @@ class AdminLoginView(APIView):
                 "profile": {},
             }
         })
+
+
+import re
+import urllib.parse
+import requests
+from django.db import transaction
+from django.conf import settings
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+class GoogleAuthUrlView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        client_id = settings.GOOGLE_CLIENT_ID
+        redirect_uri = settings.GOOGLE_REDIRECT_URI
+        
+        # Serialize the state query params
+        role = request.query_params.get("role", "")
+        state_data = {}
+        if role:
+            state_data["role"] = role
+        
+        # We can pass state as URL-encoded JSON or simple key-value pairs
+        state_str = urllib.parse.urlencode(state_data)
+        
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "access_type": "offline",
+            "prompt": "consent",
+            "state": state_str,
+        }
+        
+        url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+        return Response({"url": url})
+
+
+class GoogleAuthCallbackView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def validate_student_email(self, email):
+        email = email.lower()
+        domain = email.split("@")[1] if "@" in email else ""
+        
+        # Suffix/domain check
+        # 1. No free emails allowed
+        is_free_email = re.match(r"^(gmail|yahoo|outlook|hotmail|aol|protonmail|icloud)\.(com|co\.|net|org)$", domain)
+        if is_free_email:
+            return False
+            
+        # 2. Check for academic domain patterns or indicator terms
+        academic_patterns = re.compile(r"\.(edu|ac\.|edu\.[a-z]{2}|co\.[a-z]{2}|org\.[a-z]{2})$", re.IGNORECASE)
+        has_academic_indicators = any(term in email for term in ["student", "staff", "faculty", "lecturer", "prof", "alumni"])
+        
+        return bool(academic_patterns.search(domain) or has_academic_indicators)
+
+    def post(self, request, *args, **kwargs):
+        code = request.data.get("code")
+        if not code:
+            return Response(
+                {"detail": "Authorization code is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Exchange code for Google tokens
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "code": code,
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }
+        
+        token_response = requests.post(token_url, data=payload)
+        if not token_response.ok:
+            return Response(
+                {"detail": f"Failed to exchange Google authorization code: {token_response.text}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        tokens = token_response.json()
+        id_token_str = tokens.get("id_token")
+        if not id_token_str:
+            return Response(
+                {"detail": "Google did not return an ID token."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Verify Google ID token
+        try:
+            id_info = id_token.verify_oauth2_token(
+                id_token_str,
+                google_requests.Request(),
+                settings.GOOGLE_CLIENT_ID
+            )
+            if id_info['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+                raise ValueError('Wrong issuer.')
+        except Exception as e:
+            return Response(
+                {"detail": f"Invalid ID token: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        email = id_info.get("email")
+        first_name = id_info.get("given_name", "")
+        last_name = id_info.get("family_name", "")
+
+        if not email:
+            return Response(
+                {"detail": "Email is missing from Google account info."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate that email is an institutional/student email
+        if not self.validate_student_email(email):
+            return Response(
+                {"detail": "Access restricted. You must sign in with a valid University email account (e.g. @university.edu)."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Find user or handle registration
+        user = User.objects.filter(email__iexact=email).first()
+        
+        if not user:
+            # Check if this is the initial exchange or the registration completion request
+            role = request.data.get("role")
+            if not role:
+                # User does not exist, return detail so frontend prompts them to complete sign up
+                return Response({
+                    "registered": False,
+                    "email": email,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "message": "Valid institutional email. Please complete registration details."
+                }, status=status.HTTP_200_OK)
+
+            # Complete registration
+            university_id = request.data.get("university")
+            faculty_id = request.data.get("faculty")
+            department_id = request.data.get("department")
+            identification_number = request.data.get("identification_number")
+            level = request.data.get("level", "")
+
+            if not university_id or not department_id:
+                return Response(
+                    {"detail": "University and department are required to complete registration."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate student specifics
+            if role == User.Role.STUDENT:
+                if not identification_number:
+                    return Response(
+                        {"detail": "Matric number is required for students."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                if not level:
+                    return Response(
+                        {"detail": "Level is required for students."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            try:
+                from apps.institutions.models import University, Department
+                university = University.objects.get(id=university_id)
+                department = Department.objects.get(id=department_id)
+            except (University.DoesNotExist, Department.DoesNotExist):
+                return Response(
+                    {"detail": "Selected university or department does not exist."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create the user and profile
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    email=email,
+                    role=role,
+                    university=university,
+                    password=None
+                )
+                Profile.objects.update_or_create(
+                    user=user,
+                    defaults={
+                        "first_name": first_name or request.data.get("first_name", ""),
+                        "last_name": last_name or request.data.get("last_name", ""),
+                        "identification_number": identification_number or str(user.id),
+                        "level": level,
+                        "department": department,
+                    }
+                )
+
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["email"] = user.email
+        profile = getattr(user, "profile", None)
+        if profile:
+            refresh["first_name"] = profile.first_name
+            refresh["last_name"] = profile.last_name
+            refresh["identification_number"] = profile.identification_number
+            refresh["level"] = profile.level
+            refresh["department"] = str(profile.department.id) if profile.department else None
+            refresh["department_name"] = profile.department.name if profile.department else None
+            if profile.department and profile.department.faculty:
+                refresh["faculty"] = str(profile.department.faculty.id)
+                refresh["faculty_name"] = profile.department.faculty.name
+                if profile.department.faculty.university:
+                    refresh["university"] = str(profile.department.faculty.university.id)
+                    refresh["university_name"] = profile.department.faculty.university.name
+
+        return Response({
+            "registered": True,
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserSerializer(user, context={"request": request}).data
+        }, status=status.HTTP_200_OK)

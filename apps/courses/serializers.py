@@ -60,6 +60,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     student_id = serializers.UUIDField(source="student.id", read_only=True)
     student_name = serializers.SerializerMethodField()
     student_email = serializers.EmailField(source="student.email", read_only=True)
+    identification_number = serializers.SerializerMethodField()
     course_title = serializers.CharField(source="course.title", read_only=True)
     course_code = serializers.CharField(source="course.code", read_only=True)
 
@@ -70,6 +71,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             "student_id",
             "student_name",
             "student_email",
+            "identification_number",
             "course_title",
             "course_code",
             "created_at",
@@ -81,6 +83,10 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             full = f"{profile.first_name} {profile.last_name}".strip()
             return full if full else obj.student.email
         return obj.student.email
+
+    def get_identification_number(self, obj):
+        profile = getattr(obj.student, "profile", None)
+        return profile.identification_number if profile else ""
 
 
 class CourseDetailSerializer(CourseListSerializer):

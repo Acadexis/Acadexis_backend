@@ -27,7 +27,7 @@ def send_email_task(self, subject: str, message: str, recipient_list: list, html
         raise self.retry(exc=exc)
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def send_welcome_email(self, user_id: str):
     from apps.accounts.models import User
 
@@ -38,10 +38,14 @@ def send_welcome_email(self, user_id: str):
         return
 
     subject, text, html = build_welcome_message(user)
-    send_email_task.delay(subject, text, [user.email], html_message=html)
+    try:
+        send_email(subject, text, [user.email], html_message=html)
+    except Exception as exc:
+        logger.exception("send_welcome_email failed, retrying...")
+        raise self.retry(exc=exc)
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def send_password_reset_email(self, user_id: str, token: str):
     from apps.accounts.models import User
 
@@ -52,10 +56,14 @@ def send_password_reset_email(self, user_id: str, token: str):
         return
 
     subject, text, html = build_password_reset_message(user, token)
-    send_email_task.delay(subject, text, [user.email], html_message=html)
+    try:
+        send_email(subject, text, [user.email], html_message=html)
+    except Exception as exc:
+        logger.exception("send_password_reset_email failed, retrying...")
+        raise self.retry(exc=exc)
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def send_password_changed_email(self, user_id: str):
     from apps.accounts.models import User
 
@@ -66,4 +74,8 @@ def send_password_changed_email(self, user_id: str):
         return
 
     subject, text, html = build_password_changed_message(user)
-    send_email_task.delay(subject, text, [user.email], html_message=html)
+    try:
+        send_email(subject, text, [user.email], html_message=html)
+    except Exception as exc:
+        logger.exception("send_password_changed_email failed, retrying...")
+        raise self.retry(exc=exc)

@@ -31,7 +31,8 @@ class RegisterView(generics.CreateAPIView):
         user = s.save()
         try:
             from .tasks import send_welcome_email
-            send_welcome_email.delay(str(user.id))
+            from django.db import transaction
+            transaction.on_commit(lambda: send_welcome_email.delay(str(user.id)))
         except Exception:
             pass
         return Response(
@@ -131,7 +132,8 @@ class ForgotPasswordView(APIView):
             PasswordResetToken.objects.create(user=user, token=token)
             try:
                 from .tasks import send_password_reset_email
-                send_password_reset_email.delay(str(user.id), token)
+                from django.db import transaction
+                transaction.on_commit(lambda: send_password_reset_email.delay(str(user.id), token))
             except Exception:
                 print(f"[password reset] email={user.email} token={token}")
 
@@ -164,7 +166,8 @@ class ResetPasswordView(APIView):
 
         try:
             from .tasks import send_password_changed_email
-            send_password_changed_email.delay(str(user.id))
+            from django.db import transaction
+            transaction.on_commit(lambda: send_password_changed_email.delay(str(user.id)))
         except Exception:
             pass
 

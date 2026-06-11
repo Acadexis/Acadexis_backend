@@ -27,6 +27,7 @@ class HeatmapListView(generics.ListAPIView):
 class BookmarkViewSet(viewsets.ViewSet, generics.ListCreateAPIView):
     serializer_class = BookmarkSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         return Bookmark.objects.filter(user=self.request.user)

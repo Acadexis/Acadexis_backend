@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class StudySessionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         # Users can only access their own sessions

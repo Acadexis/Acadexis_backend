@@ -106,6 +106,11 @@ CHANNEL_LAYERS = {
 # ------------------------------------------------------------------
 AUTH_USER_MODEL = "accounts.User"
 
+AUTHENTICATION_BACKENDS = [
+    "apps.accounts.backends.CaseInsensitiveModelBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 
 # ------------------------------------------------------------------
 # Django REST Framework

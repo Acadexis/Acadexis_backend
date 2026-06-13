@@ -60,6 +60,39 @@ class AdminBaseViewSet(viewsets.ModelViewSet):
         else:
             serializer.save()
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+
+        # If they are staff but not superuser, filter by their university
+        if not user.university:
+            return qs.none()
+
+        model = self.queryset.model
+        if model == User:
+            return qs.filter(university=user.university)
+        elif model == University:
+            return qs.filter(id=user.university.id)
+        elif model == Faculty:
+            return qs.filter(university=user.university)
+        elif model == Department:
+            return qs.filter(faculty__university=user.university)
+        elif model == Course:
+            return qs.filter(department__faculty__university=user.university)
+        elif model == Enrollment:
+            return qs.filter(course__department__faculty__university=user.university)
+        elif model == CourseMaterial:
+            return qs.filter(course__department__faculty__university=user.university)
+        elif model == CourseRating:
+            return qs.filter(course__department__faculty__university=user.university)
+        elif model == StudySession:
+            return qs.filter(course__department__faculty__university=user.university)
+
+        return qs
+
+
 
 class UserAdminViewSet(AdminBaseViewSet):
     """

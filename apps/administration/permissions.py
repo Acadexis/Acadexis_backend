@@ -9,13 +9,17 @@ from rest_framework import permissions
 
 class IsStaffUser(permissions.BasePermission):
     """
-    Allow access only to authenticated staff users (is_staff=True).
+    Allow access only to authenticated staff users (is_staff=True) or users with admin role.
     """
 
-    message = "Only staff users can access this resource."
+    message = "Only staff or admin users can access this resource."
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_staff)
+        return bool(
+            request.user 
+            and request.user.is_authenticated 
+            and (request.user.is_staff or request.user.is_superuser or request.user.role == "admin")
+        )
 
 
 class IsAdminUser(permissions.BasePermission):
@@ -40,5 +44,6 @@ class IsStaffOrAdmin(permissions.BasePermission):
         return bool(
             request.user
             and request.user.is_authenticated
-            and (request.user.is_staff or request.user.is_superuser)
+            and (request.user.is_staff or request.user.is_superuser or request.user.role == "admin")
         )
+

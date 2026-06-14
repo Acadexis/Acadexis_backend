@@ -105,3 +105,19 @@ class AdministrationScopingTests(APITestCase):
         names = [u["name"] for u in results]
         self.assertIn("University of Science", names)
         self.assertIn("State College", names)
+
+    def test_non_staff_admin_access(self):
+        # Create an admin user with role='admin' but is_staff=False
+        non_staff_admin = User.objects.create_user(
+            email="nonstaffadmin@science.edu", password="password123",
+            role="admin", university=self.univ1, is_staff=False
+        )
+        self.client.force_authenticate(non_staff_admin)
+        
+        # Test that this user can successfully list users, courses, etc.
+        response = self.client.get("/api/admin/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        response = self.client.get("/api/admin/courses/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+

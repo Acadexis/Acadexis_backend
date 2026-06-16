@@ -42,21 +42,21 @@ def _extract_text(material) -> dict:
     """Extract page-by-page text from the file. Falls back to simulated text if parsing fails."""
     pages = []
     page_count = 0
-    file_path = material.file.path
 
     # Try pdfplumber
     try:
         import pdfplumber
-        with pdfplumber.open(file_path) as pdf:
-            page_count = len(pdf.pages)
-            for idx, page in enumerate(pdf.pages):
-                text = page.extract_text() or ""
-                pages.append({"page": idx + 1, "text": text})
+        with material.file.open("rb") as f:
+            with pdfplumber.open(f) as pdf:
+                page_count = len(pdf.pages)
+                for idx, page in enumerate(pdf.pages):
+                    text = page.extract_text() or ""
+                    pages.append({"page": idx + 1, "text": text})
     except Exception:
         # Try pypdf
         try:
             import pypdf
-            with open(file_path, "rb") as f:
+            with material.file.open("rb") as f:
                 reader = pypdf.PdfReader(f)
                 page_count = len(reader.pages)
                 for idx, page in enumerate(reader.pages):

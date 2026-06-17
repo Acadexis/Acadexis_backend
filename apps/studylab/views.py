@@ -41,6 +41,17 @@ class StudySessionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        response_serializer = StudySessionSerializer(
+            serializer.instance,
+            context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     # ── GET /api/sessions/{id}/messages/ ─────────────────────────────────────
     @action(detail=True, methods=["get"], url_path="messages")
     def messages(self, request, pk=None):

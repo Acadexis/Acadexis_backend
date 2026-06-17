@@ -81,6 +81,7 @@ CHANNEL_LAYERS = {"default": {
 }}
 CELERY_BROKER_URL = config("REDIS_URL")
 CELERY_RESULT_BACKEND = config("REDIS_URL")
+CELERY_TASK_ALWAYS_EAGER = True
 
 
 # ------------------------------------------------------------------

@@ -57,7 +57,7 @@ LOCAL_APPS = [
 ]
 
 
-INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = ["daphne"] + DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 
 # ------------------------------------------------------------------

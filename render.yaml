@@ -5,7 +5,7 @@ services:
     pythonVersion: "3.12"
     plan: starter
     buildCommand: bash build.sh
-    startCommand: gunicorn Acadexis_backend.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: daphne -b 0.0.0.0 -p $PORT Acadexis_backend.asgi:application
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: Acadexis_backend.settings.production

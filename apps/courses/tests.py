@@ -1,6 +1,7 @@
 from rest_framework.test import APITestCase
 from apps.accounts.models import User
 from apps.institutions.models import University, Faculty, Department
+from .models import Course
 
 class CourseAPITests(APITestCase):
     def setUp(self):
@@ -17,3 +18,19 @@ class CourseAPITests(APITestCase):
             "department": str(self.dept.id), "lecturer": str(self.lect.id),
         })
         self.assertEqual(r.status_code, 201)
+
+    def test_retrieve_course(self):
+        # First create a course
+        r = self.client.post("/api/courses/", {
+            "title": "ML", "code": "CS1", "description": "x",
+            "department": str(self.dept.id), "lecturer": str(self.lect.id),
+        })
+        self.assertEqual(r.status_code, 201)
+        
+        course = Course.objects.get(code="CS1")
+        course_id = course.id
+
+        # Retrieve the course
+        r_get = self.client.get(f"/api/courses/{course_id}/")
+        self.assertEqual(r_get.status_code, 200)
+        self.assertEqual(str(r_get.data["department"]), str(self.dept.id))

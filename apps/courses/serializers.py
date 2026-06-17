@@ -106,6 +106,7 @@ class CourseDetailSerializer(CourseListSerializer):
     class Meta(CourseListSerializer.Meta):
         fields = CourseListSerializer.Meta.fields + [
             "lecturer",
+            "department",
             "lecturer_remark",
             "updated_at",
         ]

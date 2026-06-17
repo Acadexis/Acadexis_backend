@@ -157,6 +157,7 @@ class RegisterSerializer(serializers.Serializer):
                 password=validated["password"],
                 role=validated["role"],
                 university=validated["university"],
+                is_active=False,
             )
             Profile.objects.update_or_create(
                 user=user,
@@ -198,6 +199,21 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        email = attrs.get(self.username_field)
+        password = attrs.get("password")
+        
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=email).first()
+        if user and not user.is_active:
+            if user.check_password(password):
+                raise serializers.ValidationError(
+                    {
+                        "detail": "Your email address is not verified. Please verify your email to log in.",
+                        "email_verification_required": True
+                    }
+                )
+
         data = super().validate(attrs)
         data["user"] = UserSerializer(self.user, context=self.context).data
         return data

@@ -59,3 +59,16 @@ class PasswordResetToken(models.Model):
     def is_expired(self):
         timeout = getattr(settings, "PASSWORD_RESET_TIMEOUT", 259200)
         return timezone.now() > self.created_at + timedelta(seconds=timeout)
+
+
+class EmailVerificationCode(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="verification_codes")
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timedelta(minutes=15)

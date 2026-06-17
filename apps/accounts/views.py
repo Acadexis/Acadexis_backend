@@ -29,12 +29,20 @@ class RegisterView(generics.CreateAPIView):
         s = self.get_serializer(data=request.data)
         s.is_valid(raise_exception=True)
         user = s.save()
+        
+        import random
+        from django.db import transaction
+        from .models import EmailVerificationCode
+        from .tasks import send_verification_email
+        
+        code = f"{random.randint(100000, 999999)}"
+        EmailVerificationCode.objects.create(user=user, code=code)
+        
         try:
-            from .tasks import send_welcome_email
-            from django.db import transaction
-            transaction.on_commit(lambda: send_welcome_email.delay(str(user.id)))
+            transaction.on_commit(lambda: send_verification_email.delay(str(user.id), code))
         except Exception:
             pass
+            
         return Response(
             {"success": True, "user": UserSerializer(user, context={"request": request}).data},
             status=status.HTTP_201_CREATED,
@@ -508,3 +516,97 @@ class GoogleAuthCallbackView(APIView):
             "refresh": str(refresh),
             "user": UserSerializer(user, context={"request": request}).data
         }, status=status.HTTP_200_OK)
+
+
+class VerifyEmailView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        email = request.data.get("email")
+        code_str = request.data.get("code")
+
+        if not email or not code_str:
+            return Response(
+                {"detail": "Email and verification code are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response(
+                {"detail": "User with this email does not exist."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user.is_active:
+            return Response(
+                {"detail": "This email address is already verified. Please log in."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        verification_record = user.verification_codes.filter(code=code_str, used=False).first()
+        if not verification_record:
+            return Response(
+                {"detail": "Invalid verification code."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if verification_record.is_expired():
+            return Response(
+                {"detail": "Verification code has expired. Please request a new one."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            verification_record.used = True
+            verification_record.save()
+            user.is_active = True
+            user.save()
+
+        try:
+            from .tasks import send_welcome_email
+            transaction.on_commit(lambda: send_welcome_email.delay(str(user.id)))
+        except Exception:
+            pass
+
+        return Response({"success": True, "message": "Email address verified successfully!"})
+
+
+class ResendVerificationCodeView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        email = request.data.get("email")
+
+        if not email:
+            return Response(
+                {"detail": "Email is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response(
+                {"detail": "User with this email does not exist."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user.is_active:
+            return Response(
+                {"detail": "This email address is already verified. Please log in."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        import random
+        from .models import EmailVerificationCode
+        from .tasks import send_verification_email
+
+        code = f"{random.randint(100000, 999999)}"
+        EmailVerificationCode.objects.create(user=user, code=code)
+
+        try:
+            transaction.on_commit(lambda: send_verification_email.delay(str(user.id), code))
+        except Exception:
+            pass
+
+        return Response({"success": True, "message": "A new verification code has been sent to your email."})

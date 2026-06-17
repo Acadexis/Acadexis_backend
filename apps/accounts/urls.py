@@ -13,6 +13,8 @@ from .views import (
     AdminLoginView,
     GoogleAuthUrlView,
     GoogleAuthCallbackView,
+    VerifyEmailView,
+    ResendVerificationCodeView,
 )
 
 urlpatterns = [
@@ -29,4 +31,6 @@ urlpatterns = [
     path("admin-login/", AdminLoginView.as_view(), name="auth-admin-login"),
     path("google/university/", GoogleAuthUrlView.as_view(), name="google-auth-url"),
     path("google/callback/", GoogleAuthCallbackView.as_view(), name="google-auth-callback"),
+    path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
+    path("resend-verification/", ResendVerificationCodeView.as_view(), name="resend-verification"),
 ]

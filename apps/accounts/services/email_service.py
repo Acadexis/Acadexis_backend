@@ -55,3 +55,10 @@ def build_password_changed_message(user):
     context = {"user": user}
     text, html = render_email_templates("password_changed_email", context)
     return subject, text, html
+
+
+def build_verification_message(code: str):
+    subject = "Verify your Acadexis email"
+    context = {"code": code}
+    text, html = render_email_templates("verify_email", context)
+    return subject, text, html

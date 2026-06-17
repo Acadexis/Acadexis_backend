@@ -4,6 +4,7 @@ from apps.accounts.services.email_service import (
     build_password_changed_message,
     build_password_reset_message,
     build_welcome_message,
+    build_verification_message,
     send_email,
 )
 
@@ -78,4 +79,22 @@ def send_password_changed_email(self, user_id: str):
         send_email(subject, text, [user.email], html_message=html)
     except Exception as exc:
         logger.exception("send_password_changed_email failed, retrying...")
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=10)
+def send_verification_email(self, user_id: str, code: str):
+    from apps.accounts.models import User
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        logger.error("send_verification_email: user not found %s", user_id)
+        return
+
+    subject, text, html = build_verification_message(code)
+    try:
+        send_email(subject, text, [user.email], html_message=html)
+    except Exception as exc:
+        logger.exception("send_verification_email failed, retrying...")
         raise self.retry(exc=exc)

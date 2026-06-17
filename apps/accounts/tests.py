@@ -110,3 +110,150 @@ class EmailTasksTestCase(TestCase):
         self.assertEqual(args[0], "Welcome to Acadexis")
         self.assertIn("Welcome to the family! ✨", kwargs["html_message"])
         self.assertEqual(args[2], ["testuser@test.com"])
+
+
+from rest_framework.test import APITransactionTestCase
+from apps.accounts.models import EmailVerificationCode
+from apps.institutions.models import University, Faculty, Department
+from django.utils import timezone
+from datetime import timedelta
+
+class EmailVerificationTests(APITransactionTestCase):
+    def setUp(self):
+        self.u = University.objects.create(name="UCT")
+        self.f = Faculty.objects.create(name="Eng", university=self.u)
+        self.dept = Department.objects.create(name="CS", faculty=self.f)
+
+    @patch("apps.accounts.tasks.send_verification_email.delay")
+    def test_registration_flow_creates_inactive_user_and_code(self, mock_send_email):
+        response = self.client.post("/api/auth/register/", {
+            "email": "student@university.edu",
+            "password": "Password123",
+            "role": "student",
+            "university": str(self.u.id),
+            "faculty": str(self.f.id),
+            "department": str(self.dept.id),
+            "first_name": "John",
+            "last_name": "Doe",
+            "identification_number": "STU123",
+            "level": "100",
+        })
+        self.assertEqual(response.status_code, 201)
+        
+        # Verify user is inactive
+        user = User.objects.get(email="student@university.edu")
+        self.assertFalse(user.is_active)
+        
+        # Verify verification code is created
+        code_record = EmailVerificationCode.objects.filter(user=user).first()
+        self.assertIsNotNone(code_record)
+        self.assertEqual(len(code_record.code), 6)
+        
+        # Verify celery task was queued
+        mock_send_email.assert_called_once_with(str(user.id), code_record.code)
+
+    @patch("apps.accounts.tasks.send_welcome_email.delay")
+    def test_verify_email_success(self, mock_welcome):
+        user = User.objects.create_user(
+            email="student@university.edu",
+            password="Password123",
+            role="student",
+            university=self.u,
+            is_active=False
+        )
+        code_record = EmailVerificationCode.objects.create(user=user, code="123456")
+        
+        response = self.client.post("/api/auth/verify-email/", {
+            "email": "student@university.edu",
+            "code": "123456"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        
+        # Verify user is now active
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+        
+        # Verify code is marked used
+        code_record.refresh_from_db()
+        self.assertTrue(code_record.used)
+        
+        # Verify welcome email queued
+        mock_welcome.assert_called_once_with(str(user.id))
+
+    def test_verify_email_invalid_code(self):
+        user = User.objects.create_user(
+            email="student@university.edu",
+            password="Password123",
+            role="student",
+            university=self.u,
+            is_active=False
+        )
+        EmailVerificationCode.objects.create(user=user, code="123456")
+        
+        response = self.client.post("/api/auth/verify-email/", {
+            "email": "student@university.edu",
+            "code": "654321"
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Invalid verification code", response.data["detail"])
+        
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+
+    def test_verify_email_expired_code(self):
+        user = User.objects.create_user(
+            email="student@university.edu",
+            password="Password123",
+            role="student",
+            university=self.u,
+            is_active=False
+        )
+        # Create an expired code (e.g. 20 minutes ago)
+        code_record = EmailVerificationCode.objects.create(user=user, code="123456")
+        code_record.created_at = timezone.now() - timedelta(minutes=20)
+        code_record.save()
+        
+        response = self.client.post("/api/auth/verify-email/", {
+            "email": "student@university.edu",
+            "code": "123456"
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("expired", response.data["detail"])
+
+    @patch("apps.accounts.tasks.send_verification_email.delay")
+    def test_resend_verification_code(self, mock_send):
+        user = User.objects.create_user(
+            email="student@university.edu",
+            password="Password123",
+            role="student",
+            university=self.u,
+            is_active=False
+        )
+        
+        response = self.client.post("/api/auth/resend-verification/", {
+            "email": "student@university.edu"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        
+        # Verify new code is created
+        code_record = EmailVerificationCode.objects.filter(user=user).first()
+        self.assertIsNotNone(code_record)
+        mock_send.assert_called_once_with(str(user.id), code_record.code)
+
+    def test_login_requires_verified_email(self):
+        User.objects.create_user(
+            email="student@university.edu",
+            password="Password123",
+            role="student",
+            university=self.u,
+            is_active=False
+        )
+        
+        response = self.client.post("/api/auth/login/", {
+            "email": "student@university.edu",
+            "password": "Password123"
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(response.data["email_verification_required"])

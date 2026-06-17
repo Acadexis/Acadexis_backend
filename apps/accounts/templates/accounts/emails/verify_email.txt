@@ -1,0 +1,10 @@
+Hello,
+
+Thank you for registering on Acadexis! To complete your registration and activate your account, please verify your email address using the 6-digit verification code below:
+
+Verification Code: {{ code }}
+
+This code is valid for 15 minutes. If you did not sign up for an Acadexis account, you can safely ignore this email.
+
+Cheers,
+The Acadexis Team

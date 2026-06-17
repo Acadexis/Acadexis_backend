@@ -273,6 +273,7 @@ class CourseMaterialDetailView(generics.RetrieveUpdateDestroyAPIView):
 class CourseModuleListView(generics.ListAPIView):
     serializer_class = CourseModuleSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         course_id = self.request.query_params.get("course")

@@ -19,6 +19,29 @@ class CourseAPITests(APITestCase):
         })
         self.assertEqual(r.status_code, 201)
 
+    def test_list_course_modules_returns_flat_array(self):
+        from apps.courses.models import Course, CourseModule
+        course = Course.objects.create(
+            title="Intro to CS", code="CS101", description="Intro",
+            department=self.dept, level="100"
+        )
+        module1 = CourseModule.objects.create(
+            course=course, title="Module 1", description="Intro", order=1
+        )
+        module2 = CourseModule.objects.create(
+            course=course, title="Module 2", description="Basics", order=2
+        )
+        
+        response = self.client.get(f"/api/modules/?course={course.id}")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Verify that the response is a flat list/array, not a paginated dictionary
+        self.assertIsInstance(data, list)
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["title"], "Module 1")
+        self.assertEqual(data[1]["title"], "Module 2")
+
     def test_retrieve_course(self):
         # First create a course
         r = self.client.post("/api/courses/", {

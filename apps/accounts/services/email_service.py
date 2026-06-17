@@ -13,7 +13,7 @@ def get_default_from_email():
 
 def build_password_reset_url(token: str) -> str:
     frontend_url = get_frontend_url().rstrip("/")
-    return f"{frontend_url}/reset-password?token={token}"
+    return f"{frontend_url}/auth/reset-password?token={token}"
 
 
 def render_email_templates(template_name: str, context: dict):

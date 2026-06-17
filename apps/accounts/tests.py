@@ -257,3 +257,109 @@ class EmailVerificationTests(APITransactionTestCase):
         })
         self.assertEqual(response.status_code, 400)
         self.assertTrue(response.data["email_verification_required"])
+
+
+class PasswordResetTests(APITransactionTestCase):
+    def setUp(self):
+        self.u = University.objects.create(name="UCT")
+        self.f = Faculty.objects.create(name="Eng", university=self.u)
+        self.dept = Department.objects.create(name="CS", faculty=self.f)
+        self.user = User.objects.create_user(
+            email="student@university.edu",
+            password="OldPassword123",
+            role="student",
+            university=self.u,
+            is_active=True
+        )
+
+    @patch("apps.accounts.tasks.send_password_reset_email.delay")
+    def test_forgot_password_valid_email(self, mock_send_email):
+        response = self.client.post("/api/auth/forgot-password/", {
+            "email": "student@university.edu"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["message"], "If that email is registered, a reset link has been sent.")
+        
+        # Verify PasswordResetToken was created in database
+        from apps.accounts.models import PasswordResetToken
+        reset_token = PasswordResetToken.objects.filter(user=self.user).first()
+        self.assertIsNotNone(reset_token)
+        self.assertFalse(reset_token.used)
+        
+        # Verify email celery task was queued
+        mock_send_email.assert_called_once_with(str(self.user.id), reset_token.token)
+
+    @patch("apps.accounts.tasks.send_password_reset_email.delay")
+    def test_forgot_password_invalid_email(self, mock_send_email):
+        response = self.client.post("/api/auth/forgot-password/", {
+            "email": "nonexistent@university.edu"
+        })
+        # For security reasons, should return 200 OK and same message
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["message"], "If that email is registered, a reset link has been sent.")
+        
+        # Verify no token was created
+        from apps.accounts.models import PasswordResetToken
+        self.assertEqual(PasswordResetToken.objects.count(), 0)
+        
+        # Verify email celery task was NOT queued
+        mock_send_email.assert_not_called()
+
+    @patch("apps.accounts.tasks.send_password_changed_email.delay")
+    def test_reset_password_success(self, mock_send_email):
+        from apps.accounts.models import PasswordResetToken
+        from django.contrib.auth.tokens import default_token_generator
+        
+        token = default_token_generator.make_token(self.user)
+        reset_token = PasswordResetToken.objects.create(user=self.user, token=token)
+        
+        response = self.client.post("/api/auth/reset-password/", {
+            "token": token,
+            "new_password": "NewPassword123"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["message"], "Password has been reset successfully.")
+        
+        # Verify user password is updated
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewPassword123"))
+        
+        # Verify token is marked used
+        reset_token.refresh_from_db()
+        self.assertTrue(reset_token.used)
+        
+        # Verify email task was queued
+        mock_send_email.assert_called_once_with(str(self.user.id))
+
+    def test_reset_password_invalid_token(self):
+        response = self.client.post("/api/auth/reset-password/", {
+            "token": "invalid-token-here",
+            "new_password": "NewPassword123"
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["detail"], "Invalid or expired reset token.")
+        
+        # Verify password did not change
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("OldPassword123"))
+
+    def test_reset_password_expired_token(self):
+        from apps.accounts.models import PasswordResetToken
+        from django.contrib.auth.tokens import default_token_generator
+        
+        token = default_token_generator.make_token(self.user)
+        reset_token = PasswordResetToken.objects.create(user=self.user, token=token)
+        # Override auto_now_add field by using filter().update()
+        PasswordResetToken.objects.filter(id=reset_token.id).update(created_at=timezone.now() - timedelta(days=5))
+        
+        response = self.client.post("/api/auth/reset-password/", {
+            "token": token,
+            "new_password": "NewPassword123"
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["detail"], "Invalid or expired reset token.")
+        
+        # Verify password did not change
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("OldPassword123"))
+

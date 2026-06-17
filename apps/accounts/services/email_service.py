@@ -8,11 +8,7 @@ def get_frontend_url():
 
 
 def get_default_from_email():
-    default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost")
-    email_name = getattr(settings, "EMAIL_FROM_NAME", "").strip()
-    if email_name:
-        return f"{email_name} <{default_from}>"
-    return default_from
+    return getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost")
 
 
 def build_password_reset_url(token: str) -> str:

@@ -6,8 +6,6 @@ class NotificationSerializer(serializers.ModelSerializer):
     # Aliases to satisfy frontend contract
     message = serializers.CharField(source="body", read_only=True)
     type = serializers.CharField(source="notification_type", read_only=True)
-    notification_type = serializers.CharField(source="notification_type", read_only=True)
-    body = serializers.CharField(source="body", read_only=True)
     user = serializers.SerializerMethodField()
 
     class Meta:

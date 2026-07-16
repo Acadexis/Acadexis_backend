@@ -328,5 +328,42 @@ LOGGING = {
         "apps.studylab": {"handlers": ["console"], "level": "INFO", "propagate": False},
         "apps.notifications": {"handlers": ["console"], "level": "INFO", "propagate": False},
         "apps.analytics": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "rag": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
+
+
+# ------------------------------------------------------------------
+# RAG AI Pipeline Settings  (AI team responsibility)
+# ------------------------------------------------------------------
+# These are read by rag/config.py which bridges them to the RAG modules.
+# The backend team does not need to modify these.
+
+GOOGLE_API_KEY = config("GOOGLE_API_KEY", default="")
+PINECONE_API_KEY = config("PINECONE_API_KEY", default="")
+PINECONE_INDEX_NAME = config("PINECONE_INDEX_NAME", default="acadexis-knowledge")
+PINECONE_CLOUD = config("PINECONE_CLOUD", default="aws")
+PINECONE_REGION = config("PINECONE_REGION", default="us-east-1")
+COHERE_API_KEY = config("COHERE_API_KEY", default="")
+
+GEMINI_EMBEDDING_MODEL = config("GEMINI_EMBEDDING_MODEL", default="gemini-embedding-2-preview")
+GEMINI_EMBEDDING_DIMENSION = config("GEMINI_EMBEDDING_DIMENSION", default=3072, cast=int)
+GEMINI_FLASH_MODEL = config("GEMINI_FLASH_MODEL", default="gemini-2.0-flash")
+GEMINI_PRO_MODEL = config("GEMINI_PRO_MODEL", default="gemini-1.5-pro")
+
+RAG_MULTIMODAL_ENABLED = config("RAG_MULTIMODAL_ENABLED", default=True, cast=bool)
+RAG_MULTIMODAL_MIN_IMAGE_PX = config("RAG_MULTIMODAL_MIN_IMAGE_PX", default=50, cast=int)
+RAG_MULTIMODAL_CONTEXT_CHARS = config("RAG_MULTIMODAL_CONTEXT_CHARS", default=400, cast=int)
+
+RAG_CACHE_ENABLED = config("RAG_CACHE_ENABLED", default=True, cast=bool)
+RAG_CACHE_TTL_HOURS = config("RAG_CACHE_TTL_HOURS", default=24, cast=int)
+RAG_CACHE_MIN_TOKENS = config("RAG_CACHE_MIN_TOKENS", default=32768, cast=int)
+
+RAG_CHUNK_SIZE = config("RAG_CHUNK_SIZE", default=800, cast=int)
+RAG_CHUNK_OVERLAP = config("RAG_CHUNK_OVERLAP", default=200, cast=int)
+RAG_MAX_UPLOAD_MB = config("RAG_MAX_UPLOAD_MB", default=50, cast=int)
+
+# LangSmith observability (optional — leave blank to disable tracing)
+LANGCHAIN_TRACING_V2 = config("LANGCHAIN_TRACING_V2", default=False, cast=bool)
+LANGCHAIN_API_KEY = config("LANGCHAIN_API_KEY", default="")
+LANGCHAIN_PROJECT = config("LANGCHAIN_PROJECT", default="acadexis-django")
